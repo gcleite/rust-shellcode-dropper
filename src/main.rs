@@ -1,16 +1,25 @@
-use std::ffi::CString;
-use std::ptr::null_mut;
+use windows::{
+    core::*, Data::Xml::Dom::*, Win32::Foundation::*, Win32::System::Threading::*,
+    Win32::UI::WindowsAndMessaging::*,
+};
 
-#[link(name = "user32")]
-extern "stdcall" {
-    fn MessageBoxA(hWnd: *mut libc::c_void, lpText: *const libc::c_char, lpCaption: *const libc::c_char, uType: libc::c_uint) -> libc::c_int;
-}
+fn main() -> Result<()> {
+    let doc = XmlDocument::new()?;
+    doc.LoadXml(h!("<html>hello world</html>"))?;
 
-fn main() {
-    let text = CString::new("Hello, world!").unwrap();
-    let caption = CString::new("Message Box").unwrap();
+    let root = doc.DocumentElement()?;
+    assert!(root.NodeName()? == "html");
+    assert!(root.InnerText()? == "hello world");
 
     unsafe {
-        MessageBoxA(null_mut(), text.as_ptr(), caption.as_ptr(), 0);
+        let event = CreateEventW(None, true, false, None)?;
+        SetEvent(event).ok()?;
+        WaitForSingleObject(event, 0);
+        CloseHandle(event).ok()?;
+
+        MessageBoxA(None, s!("Ansi"), s!("Caption"), MB_OK);
+        MessageBoxW(None, w!("Wide"), w!("Caption"), MB_OK);
     }
+
+    Ok(())
 }
