@@ -5,6 +5,7 @@ use windows::{
     Win32::System::Threading::*,
     Win32::UI::WindowsAndMessaging::*,
     Win32::System::Memory::*,
+    windows::Win32::System::WindowsProgramming::INFINITE,
     MemoryProtection
 };
 use std::ptr::*;
@@ -51,34 +52,40 @@ fn main() {
     }
 
     let buf: [u8; 2] = [0x8b, 0x3f];
-    de_xor(buf);
+    // de_xor(buf);
     let size = buf.len();
 
     let addr = unsafe {
         VirtualAlloc(
-            ptr::null_mut(),
+            Some(0 as *mut _),
             0x1000,
             MEM_RESERVE | MEM_COMMIT,
             PAGE_EXECUTE_READWRITE,
         )
     };
 
+    unsafe { std::ptr::copy_nonoverlapping(buf.as_ptr(), addr as *mut u8,  size) };
+
     let thread_id = unsafe {
-        let mut thread_id = MaybeUninit::<DWORD>::uninit();
-        let thread_handle = CreateThread(
-            ptr::null_mut(),
-            0,
-            addr as LPTHREAD_START_ROUTINE,
-            ptr::null_mut(),
-            0,
-            thread_id.as_mut_ptr(),
+        extern "system" fn worker_thread(lpThreadParameter: *mut ::std::os::raw::c_void) -> u32 {
+            println!("Thread started!");
+            0
+        }
+
+        let t_handle = CreateThread(
+            Some(0 as *mut _), 
+            0, 
+            Some(worker_thread), 
+            Some(addr), 
+            THREAD_CREATION_FLAGS(0), 
+            Some(0 as *mut _),
         );
-        if thread_handle.is_null() {
+
+        if t_handle.is_err() {
             return;
         }
 
-        WaitForSingleObject(thread_handle, INFINITE);
-        thread_id.assume_init()
+        WaitForSingleObject(t_handle, INFINITE);
     };
 }
 
